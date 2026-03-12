@@ -98,6 +98,24 @@ React 19 removed `_debugSource` from Fiber nodes. ReactPeek will still show comp
 - React app running in **development mode** on localhost
 - React 16+ supported
 
+### Next.js 16 + Turbopack Note
+
+Next.js 16 uses **Turbopack** by default, which doesn't provide proper source maps for component file paths. You'll see file paths like `// File: _next/static/chunks/turbopack-*.js` instead of actual source files.
+
+**Solution:** Use webpack instead of Turbopack:
+
+```bash
+# In your Next.js project's package.json
+"dev": "next dev --webpack"
+```
+
+Or set the environment variable:
+```bash
+NEXT_TURBOPACK=false next dev
+```
+
+This ensures ReactPeek can correctly identify component source files.
+
 ## Tech Stack
 
 - TypeScript (strict mode)
