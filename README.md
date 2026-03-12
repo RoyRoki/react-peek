@@ -29,14 +29,42 @@ When doing UI fixes with AI agents (Claude Code, Cursor, Copilot), you:
 // Props: { variant: "primary", size: "lg" }
 ```
 
-## Install (Development)
+## Install (Open Source)
 
-1. Clone this repo
-2. `npm install && npm run build`
-3. Open `chrome://extensions`
-4. Enable "Developer mode"
+Since this is an open-source project (no Chrome Web Store), you can install it manually:
+
+### Option 1: Load Unpacked Extension
+
+1. Clone this repo:
+   ```bash
+   git clone https://github.com/RoyRoki/react-peek.git
+   cd react-peek
+   ```
+
+2. Install dependencies and build:
+   ```bash
+   npm install
+   npm run build
+   ```
+
+3. Open Chrome and navigate to `chrome://extensions`
+
+4. Enable "Developer mode" (top right corner)
+
 5. Click "Load unpacked" → select the `build/` folder
+
 6. Navigate to your React app on `localhost`
+
+### Option 2: Download Release
+
+Download the latest `react-peek.zip` from the [Releases](https://github.com/RoyRoki/react-peek/releases) page:
+
+1. Go to [Releases](https://github.com/RoyRoki/react-peek/releases)
+2. Download `react-peek.zip`
+3. Extract the zip file
+4. In Chrome, go to `chrome://extensions`
+5. Enable "Developer mode"
+6. Click "Load unpacked" → select the extracted folder
 
 ## Usage
 
