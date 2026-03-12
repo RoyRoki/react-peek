@@ -1,0 +1,18 @@
+{
+  "name": "react-peek",
+  "version": "0.1.0",
+  "description": "Click any React component, copy its source location for AI agent prompts",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && cd build && zip -r ../react-peek.zip ."
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.1.74",
+    "@types/chrome": "^0.1.37",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
