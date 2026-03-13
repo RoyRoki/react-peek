@@ -62,7 +62,7 @@ function getFiberSourceFile(fiber: Fiber): string {
 export function isThirdPartyFiber(fiber: Fiber): boolean {
   const src = getFiberSourceFile(fiber);
   if (!src) return false;
-  return src.includes('node_modules') || src.includes('.vite/deps') || src.includes('chunk-');
+  return src.includes('node_modules') || src.includes('.vite/deps') || src.includes('chunk-') || src.includes('next/dist/client');
 }
 
 // Exact names that are always noise
@@ -73,13 +73,15 @@ const NOISY_EXACT = new Set([
   // React Router
   'BrowserRouter', 'HashRouter', 'MemoryRouter', 'StaticRouter',
   'Router', 'Routes', 'Route', 'Outlet', 'Navigate', 'NavLink', 'Link',
-  'RenderedRoute', 'Navigation', 'Location',
+  'RenderedRoute', 'Navigation', 'Location', 'RouteContext',
   // Generic React patterns
   'Provider', 'Consumer', 'ForwardRef', 'Memo',
   // Recharts internals visible in the wild
   'CartesianChart2', 'RechartsStoreProvider', 'CartesianChartRoot',
   'ResponsiveContainerContextProvider', 'AllZIndexPortals', 'ClipPathProvider',
   'LegendContent', 'DefaultLegendContent', 'Items',
+  // Next.js dev overlay
+  'ReactDevOverlay', 'DevRoot', 'HotReloader', 'NextJsHotReloaderError',
 ]);
 
 // Suffix/prefix patterns that indicate library wrappers
@@ -87,6 +89,7 @@ const NOISY_PATTERNS = [
   /Provider$/, /Consumer$/, /Context$/, /Store$/,
   /Portal$/, /Boundary$/, /Wrapper$/,
   /^Recharts/, /^Cartesian/, /^Responsive/, /^ClipPath/, /^AllZ/,
+  /^Next/, /^Dynamic/, /^Head/, /^Link$/, /^Script/,
 ];
 
 export function isNoisyComponent(fiber: Fiber): boolean {
@@ -143,11 +146,14 @@ export function getParentComponentFiber(fiber: Fiber): Fiber | null {
 export function getFirstChildComponentFiber(fiber: Fiber): Fiber | null {
   let current = fiber.child;
   while (current) {
-    if (isUserComponent(current)) {
+    if (isUserComponent(current) && !isNoisyComponent(current)) {
       return current;
     }
-    const deeper = getFirstChildComponentFiber(current);
-    if (deeper) return deeper;
+    // Check children of current fiber first
+    if (current.child) {
+      const childResult = getFirstChildComponentFiber(current);
+      if (childResult) return childResult;
+    }
     current = current.sibling;
   }
   return null;

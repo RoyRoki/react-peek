@@ -24,6 +24,7 @@ export interface FormatOptions {
   includeProps: boolean;
   includeTree: boolean;
   route?: string;
+  windowSize?: { width: number; height: number };
 }
 
 export interface Fiber {

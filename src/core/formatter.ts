@@ -1,7 +1,7 @@
 import type { ComponentInfo, FormatOptions } from './types';
 
-function formatSource(info: ComponentInfo): string {
-  if (!info.source) return '(source unavailable)';
+function formatSource(info: ComponentInfo): string | null {
+  if (!info.source) return null;
   const col = info.source.columnNumber ? `:${info.source.columnNumber}` : '';
   return `${info.source.fileName}:${info.source.lineNumber}${col}`;
 }
@@ -36,40 +36,52 @@ export function formatForClipboard(
 ): string {
   const lines: string[] = [];
 
-  lines.push(`// Component: ${info.name}`);
+  const sourceStr = formatSource(info);
 
-  if (info.source) {
-    lines.push(`// File: ${formatSource(info)}`);
-  } else {
-    lines.push(`// File: (unavailable — React 19 without source maps plugin)`);
-  }
-
-  if (parent) {
-    lines.push(`// Parent: ${parent.name}${parent.source ? ` (${formatSource(parent)})` : ''}`);
-  }
-
-  // Tree always included — most useful context for an AI agent
+  let treeHierarchy = '';
   if (path.length > 1) {
     let treeNames = path.map((c) => c.name);
-    // If truncated (getComponentPath returns first3+last5), insert ellipsis
-    // We detect truncation by checking if path length was already capped (8 max)
     if (treeNames.length === 8) {
       treeNames = [...treeNames.slice(0, 3), '...', ...treeNames.slice(3)];
     }
-    lines.push(`// Tree: ${treeNames.join(' > ')}`);
+    treeHierarchy = treeNames.join(' > ');
+  }
+
+  lines.push('### Component Metadata');
+  
+  lines.push(`- **Name:** \`${info.name}\``);
+
+  if (info.framework && info.framework !== 'unknown') {
+    lines.push(`- **Type:** ${info.framework === 'nextjs' ? 'Next.js' : info.framework === 'remix' ? 'Remix' : 'React'} Component`);
+  }
+
+  if (sourceStr) {
+    lines.push(`- **File Path:** \`${sourceStr}\``);
+  }
+
+  if (parent) {
+    lines.push(`- **Parent:** ${parent.name}`);
+  }
+
+  if (treeHierarchy) {
+    lines.push(`- **Hierarchy:** ${treeHierarchy}`);
   }
 
   if (options.includeProps && Object.keys(info.props).length > 0) {
-    lines.push(`// Props: ${formatProps(info.props)}`);
+    lines.push(`- **Props:** ${formatProps(info.props)}`);
   }
 
   if (options.extended) {
-    lines.push(`// Framework: ${info.framework}`);
     if (options.route) {
-      lines.push(`// Route: ${options.route}`);
+      lines.push(`- **Route:** ${options.route}`);
+    }
+    if (options.windowSize) {
+      const { width, height } = options.windowSize;
+      const viewType = width >= 768 ? 'Desktop' : 'Mobile';
+      lines.push(`- **View:** ${width}x${height} (${viewType})`);
     }
     if (info.isThirdParty) {
-      lines.push(`// Note: Third-party component`);
+      lines.push(`- **Note:** Third-party component`);
     }
   }
 

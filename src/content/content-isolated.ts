@@ -11,12 +11,19 @@ let currentRoute = '';
 let showProps = true;
 let mainWorldReady = false;
 let hovering = false;
+let panelHidden = false;
+let isMobileView = false;
+let hasSource = true;
+let showLLMPrompt = false;
 
 // DOM elements
 let overlayEl: HTMLDivElement | null = null;
 let labelEl: HTMLDivElement | null = null;
 let panelEl: HTMLDivElement | null = null;
 let containerEl: HTMLDivElement | null = null;
+let badgeEl: HTMLDivElement | null = null;
+let tooltipEl: HTMLDivElement | null = null;
+let tooltipTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Throttle
 let rafId: number | null = null;
@@ -66,7 +73,7 @@ function injectMainWorldScript() {
 function createUI() {
   containerEl = document.createElement('div');
   containerEl.id = '__reactpeek-container';
-  containerEl.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
+  containerEl.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;';
   const shadow = containerEl.attachShadow({ mode: 'open' });
 
   const style = document.createElement('style');
@@ -110,7 +117,7 @@ function createUI() {
       position: fixed;
       bottom: 16px;
       right: 16px;
-      background: #0f172a;
+      background: rgba(15, 23, 42, 0.85);
       color: #e2e8f0;
       font: 12px/1.5 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       padding: 12px 16px;
@@ -121,6 +128,11 @@ function createUI() {
       z-index: 2147483647;
       max-width: 480px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .rp-panel.hidden {
+      display: none;
     }
     .rp-panel-title {
       font-weight: 700;
@@ -165,6 +177,54 @@ function createUI() {
       pointer-events: none;
       box-shadow: 0 2px 8px rgba(59,130,246,0.4);
     }
+    .rp-badge.no-source {
+      background: #ef4444;
+      box-shadow: 0 2px 8px rgba(239,68,68,0.4);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .rp-badge.no-source:hover {
+      background: #dc2626;
+    }
+    .rp-tooltip {
+      position: fixed;
+      top: 36px;
+      right: 8px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font: 11px/1.4 system-ui, sans-serif;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      z-index: 2147483647;
+      max-width: 320px;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      white-space: pre-line;
+    }
+    .rp-tooltip.visible {
+      display: block;
+    }
+    .rp-panel-prompt-label {
+      color: #f59e0b;
+      font-size: 10px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .rp-panel-prompt-text {
+      color: #cbd5e1;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 8px;
+      background: rgba(0,0,0,0.3);
+    }
   `;
   shadow.appendChild(style);
 
@@ -181,11 +241,20 @@ function createUI() {
   shadow.appendChild(panelEl);
 
   // Active badge
-  const badge = document.createElement('div');
-  badge.className = 'rp-badge';
-  badge.textContent = 'ReactPeek ON';
-  badge.id = 'rp-badge';
-  shadow.appendChild(badge);
+  badgeEl = document.createElement('div');
+  badgeEl.className = 'rp-badge';
+  badgeEl.textContent = 'ReactPeek ON';
+  badgeEl.id = 'rp-badge';
+  badgeEl.addEventListener('click', copyFixPrompt);
+  badgeEl.addEventListener('mouseenter', showTooltip);
+  badgeEl.addEventListener('mouseleave', hideTooltip);
+  shadow.appendChild(badgeEl);
+
+  // Tooltip for fix instructions
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'rp-tooltip';
+  tooltipEl.textContent = `To enable source maps:\n\nWebpack: devtool: 'source-map'\nVite: build.sourcemap: true\nCRA: GENERATE_SOURCEMAP=true`;
+  shadow.appendChild(tooltipEl);
 
   document.body.appendChild(containerEl);
 }
@@ -196,6 +265,47 @@ function destroyUI() {
   overlayEl = null;
   labelEl = null;
   panelEl = null;
+  badgeEl = null;
+  tooltipEl = null;
+}
+
+function getLLMPrompt(): string {
+  return `To enable source maps:
+
+Webpack:  devtool: 'source-map'
+Next.js:  productionBrowserSourceMaps: true
+Vite:     build.sourcemap: true
+CRA:      GENERATE_SOURCEMAP=true
+
+Then restart your dev server.`;
+}
+
+function copyFixPrompt() {
+  if (hasSource) return;
+  const prompt = getLLMPrompt();
+  navigator.clipboard.writeText(prompt).then(() => {
+    if (badgeEl) {
+      const prevText = badgeEl.textContent;
+      badgeEl.textContent = 'Copied!';
+      setTimeout(() => {
+        if (badgeEl) badgeEl.textContent = prevText;
+      }, 1500);
+    }
+  });
+}
+
+function showTooltip() {
+  if (!tooltipEl || hasSource) return;
+  tooltipEl.classList.add('visible');
+  showLLMPrompt = true;
+  updatePanel(currentInfo, currentParent, currentPath);
+}
+
+function hideTooltip() {
+  if (!tooltipEl) return;
+  tooltipEl.classList.remove('visible');
+  showLLMPrompt = false;
+  updatePanel(currentInfo, currentParent, currentPath);
 }
 
 function updateOverlay(rect: DOMRect | null, info: ComponentInfo | null) {
@@ -224,8 +334,42 @@ function updateOverlay(rect: DOMRect | null, info: ComponentInfo | null) {
   labelEl.style.left = `${Math.max(4, rect.left)}px`;
 }
 
+function checkMobileView() {
+  isMobileView = window.innerWidth < 768;
+  if (isMobileView) {
+    panelHidden = true;
+  }
+  updatePanelVisibility();
+}
+
+function updatePanelVisibility() {
+  if (!panelEl) return;
+  if (panelHidden || isMobileView) {
+    panelEl.classList.add('hidden');
+    panelEl.style.display = 'none';
+  } else {
+    panelEl.classList.remove('hidden');
+    panelEl.style.display = 'block';
+  }
+}
+
 function updatePanel(info: ComponentInfo | null, parent: ComponentInfo | null, path: ComponentInfo[]) {
   if (!panelEl) return;
+
+  if (showLLMPrompt) {
+    const prompt = getLLMPrompt();
+    panelEl.style.display = 'block';
+    panelEl.innerHTML = `
+      <div class="rp-panel-title" style="color:#ef4444">No Source — Enable Source Maps</div>
+      <div class="rp-panel-prompt-text">${prompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+      <div class="rp-panel-hint">
+        <kbd>Click</kbd> badge to copy &nbsp;
+        <kbd>Esc</kbd> exit
+      </div>
+    `;
+    return;
+  }
+
   if (!info) {
     panelEl.style.display = 'none';
     return;
@@ -250,12 +394,13 @@ function updatePanel(info: ComponentInfo | null, parent: ComponentInfo | null, p
     <div class="rp-panel-row">Tree: <span>${treePath}</span></div>
     <div class="rp-panel-hint">
       <kbd>Click</kbd> copy &nbsp;
-      <kbd>E</kbd> extended copy &nbsp;
       <kbd>&uarr;&darr;&larr;&rarr;</kbd> navigate &nbsp;
       <kbd>P</kbd> props &nbsp;
+      <kbd>H</kbd> panel toggle &nbsp;
       <kbd>Esc</kbd> exit
     </div>
   `;
+  updatePanelVisibility();
 }
 
 // Event handlers
@@ -275,9 +420,22 @@ function onMouseMove(e: MouseEvent) {
     currentRoute = window.location.pathname;
     hovering = true;
 
+    hasSource = !!result.info.source;
+    updateBadge();
     updateOverlay(result.rect, result.info);
     updatePanel(result.info, result.parent, result.path);
   });
+}
+
+function updateBadge() {
+  if (!badgeEl) return;
+  if (hasSource) {
+    badgeEl.classList.remove('no-source');
+    badgeEl.textContent = 'ReactPeek ON';
+  } else {
+    badgeEl.classList.add('no-source');
+    badgeEl.textContent = 'ReactPeek No Source';
+  }
 }
 
 function copyToClipboard(extended: boolean) {
@@ -288,6 +446,7 @@ function copyToClipboard(extended: boolean) {
     includeProps: showProps,
     includeTree: extended,
     route: currentRoute,
+    windowSize: { width: window.innerWidth, height: window.innerHeight },
   };
 
   const text = formatForClipboard(currentInfo, currentParent, currentPath, options);
@@ -319,10 +478,13 @@ function copyToClipboard(extended: boolean) {
 
 function onClick(e: MouseEvent) {
   if (!active) return;
+  // If clicking on our own UI, let the UI handles it
+  if (e.target === containerEl) return;
+
   e.preventDefault();
   e.stopPropagation();
   e.stopImmediatePropagation();
-  copyToClipboard(false);
+  copyToClipboard(true);
 }
 
 async function navigate(direction: 'up' | 'down' | 'left' | 'right') {
@@ -361,11 +523,6 @@ function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       navigate('right');
       break;
-    case 'e':
-    case 'E':
-      e.preventDefault();
-      copyToClipboard(true);
-      break;
     case 'p':
     case 'P':
       e.preventDefault();
@@ -376,7 +533,13 @@ function onKeyDown(e: KeyboardEvent) {
     case 'c':
     case 'C':
       e.preventDefault();
-      copyToClipboard(false);
+      copyToClipboard(true);
+      break;
+    case 'h':
+    case 'H':
+      e.preventDefault();
+      panelHidden = !panelHidden;
+      updatePanelVisibility();
       break;
   }
 }
@@ -385,6 +548,8 @@ function activate() {
   if (active) return;
   active = true;
   createUI();
+  checkMobileView();
+  window.addEventListener('resize', checkMobileView);
   document.addEventListener('mousemove', onMouseMove, true);
   document.addEventListener('click', onClick, true);
   document.addEventListener('keydown', onKeyDown, true);
@@ -396,6 +561,7 @@ function activate() {
 function deactivate() {
   if (!active) return;
   active = false;
+  window.removeEventListener('resize', checkMobileView);
   document.removeEventListener('mousemove', onMouseMove, true);
   document.removeEventListener('click', onClick, true);
   document.removeEventListener('keydown', onKeyDown, true);
@@ -406,10 +572,16 @@ function deactivate() {
   currentParent = null;
   currentPath = [];
   currentRect = null;
+  panelHidden = false;
+  isMobileView = false;
+  hasSource = true;
+  showLLMPrompt = false;
 }
 
 function blockEvent(e: Event) {
   if (!active) return;
+  if (e.target === containerEl) return;
+
   e.preventDefault();
   e.stopPropagation();
   e.stopImmediatePropagation();

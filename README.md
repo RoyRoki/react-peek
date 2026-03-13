@@ -66,6 +66,15 @@ Download the latest `react-peek.zip` from the [Releases](https://github.com/RoyR
 5. Enable "Developer mode"
 6. Click "Load unpacked" → select the extracted folder
 
+## Features
+
+- **Visual Inspector:** Hover over any React component to see its name, source file, line number, and hierarchy.
+- **Smart Navigation:** Use arrow keys to traverse the component tree (parent, children, siblings).
+- **Prop Inspector:** View component props in the panel.
+- **No Source Detection:** Detects when source maps are missing (common in production or misconfigured dev environments).
+- **AI-Ready Copy:** Format component context specifically for AI coding agents.
+- **Prompt Helper:** When source maps are missing, a red "No Source" badge appears. Click it to copy a ready-to-use prompt that tells your agent how to fix your project's configuration.
+
 ## Usage
 
 | Action | Key |
@@ -77,6 +86,7 @@ Download the latest `react-peek.zip` from the [Releases](https://github.com/RoyR
 | Copy (standard) | `Click` or `C` |
 | Copy (extended) | `E` |
 | Toggle props | `P` |
+| **Copy fix prompt** | **Click "No Source" badge** |
 | Exit | `Esc` |
 
 ## How It Works
